@@ -1,0 +1,842 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>LangGraph的三剑客 | QDeepFlow's Blog</title><meta name="author" content="QDeepFlow"><meta name="copyright" content="QDeepFlow"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#f0f9ff"><meta name="description" content="LangGraph ：State、Node、Edge 的基本概念 之前我们使用langchain的时候，是一条线型的，输入 -》 步骤1 -&gt; 步骤2 -&gt; 步骤3 -&gt; 输出，如果你想要执行步骤2的时候回到步骤1， 进入一个循环那就不行了，因为我们知道Agent的核心是ReAct的模式，需要进入循环模式， 用户输入 -&gt; 思考 -&gt; 调用工具 -&gt; 查看结果">
+<meta property="og:type" content="article">
+<meta property="og:title" content="LangGraph的三剑客">
+<meta property="og:url" content="https://qdeepflow.github.io/2026/04/29/LangGraph%E7%9A%84%E4%B8%89%E5%89%91%E5%AE%A2/index.html">
+<meta property="og:site_name" content="QDeepFlow&#39;s Blog">
+<meta property="og:description" content="LangGraph ：State、Node、Edge 的基本概念 之前我们使用langchain的时候，是一条线型的，输入 -》 步骤1 -&gt; 步骤2 -&gt; 步骤3 -&gt; 输出，如果你想要执行步骤2的时候回到步骤1， 进入一个循环那就不行了，因为我们知道Agent的核心是ReAct的模式，需要进入循环模式， 用户输入 -&gt; 思考 -&gt; 调用工具 -&gt; 查看结果">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://qdeepflow.github.io/img/my.png">
+<meta property="article:published_time" content="2026-04-29T08:16:00.000Z">
+<meta property="article:modified_time" content="2026-04-29T08:38:36.587Z">
+<meta property="article:author" content="QDeepFlow">
+<meta property="article:tag" content="langchain">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://qdeepflow.github.io/img/my.png"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "LangGraph的三剑客",
+  "url": "https://qdeepflow.github.io/2026/04/29/LangGraph%E7%9A%84%E4%B8%89%E5%89%91%E5%AE%A2/",
+  "image": "https://qdeepflow.github.io/img/my.png",
+  "datePublished": "2026-04-29T08:16:00.000Z",
+  "dateModified": "2026-04-29T08:38:36.587Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "QDeepFlow",
+      "url": "https://qdeepflow.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://qdeepflow.github.io/2026/04/29/LangGraph%E7%9A%84%E4%B8%89%E5%89%91%E5%AE%A2/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//fonts.googleapis.com" crossorigin=""/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/node-snackbar@0.1.16/dist/snackbar.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@6.1.9/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!true && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0f172a')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f0f9ff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&amp;display=swap" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.json","preload":true,"top_n_per_article":1,"unescape":false,"pagination":{"enable":false,"hitsPerPage":8},"languages":{"hits_empty":"未找到符合您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":350,"highlightFullpage":false,"highlightMacStyle":true},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '天',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: {"limitCount":150,"languages":{"author":"作者: QDeepFlow","link":"链接: ","source":"来源: QDeepFlow's Blog","info":"著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。"}},
+  lightbox: 'fancybox',
+  Snackbar: {"chs_to_cht":"已切换为繁体中文","cht_to_chs":"已切换为简体中文","day_to_night":"已切换为深色模式","night_to_day":"已切换为浅色模式","bgLight":"#0891b2","bgDark":"#1e293b","position":"bottom-left"},
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: true,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: true,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'LangGraph的三剑客',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><link rel="stylesheet" href="/css/custom.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><meta name="generator" content="Hexo 8.1.1"></head><body><div id="loading-box"><div class="loading-left-bg"></div><div class="loading-right-bg"></div><div class="spinner-box"><div class="configure-border-1"><div class="configure-core"></div></div><div class="configure-border-2"><div class="configure-core"></div></div><div class="loading-word">加载中...</div></div></div><script>(()=>{
+  const $loadingBox = document.getElementById('loading-box')
+  const $body = document.body
+  const preloader = {
+    endLoading: () => {
+      if ($loadingBox.classList.contains('loaded')) return
+      $body.style.overflow = ''
+      $loadingBox.classList.add('loaded')
+    },
+    initLoading: () => {
+      $body.style.overflow = 'hidden'
+      $loadingBox.classList.remove('loaded')
+    }
+  }
+
+  preloader.initLoading()
+
+  if (document.readyState === 'complete') {
+    preloader.endLoading()
+  } else {
+    window.addEventListener('load', preloader.endLoading)
+    document.addEventListener('DOMContentLoaded', preloader.endLoading)
+    // Add timeout protection: force end after 7 seconds
+    setTimeout(preloader.endLoading, 7000)
+  }
+
+  if (true) {
+    btf.addGlobalFn('pjaxSend', preloader.initLoading, 'preloader_init')
+    btf.addGlobalFn('pjaxComplete', preloader.endLoading, 'preloader_end')
+  }
+})()</script><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img text-center"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/img/my.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="site-data text-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">10</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">3</div></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg fixed" id="page-header" style="background: linear-gradient(135deg, #0c4a6e 0%, #1e1b4b 50%, #06b6d4 100%);"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">QDeepFlow's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">LangGraph的三剑客</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"><div id="search-button"><span class="site-page social-icon search"><i class="fas fa-search fa-fw"></i><span> 搜索</span></span></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><span class="site-page"><i class="fas fa-bars fa-fw"></i></span></div></div></nav><div id="post-info"><h1 class="post-title">LangGraph的三剑客</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-04-29T08:16:00.000Z" title="发表于 2026-04-29 16:16:00">2026-04-29</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-29T08:38:36.587Z" title="更新于 2026-04-29 16:38:36">2026-04-29</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">总字数:</span><span class="word-count">4k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">阅读时长:</span><span>16分钟</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><div id="post-outdate-notice" data="{&quot;limitDay&quot;:365,&quot;messagePrev&quot;:&quot;⚠ 本文已在&quot;,&quot;messageNext&quot;:&quot;天前更新，部分内容可能已过时。&quot;,&quot;postUpdate&quot;:&quot;2026-04-29 16:38:36&quot;}" hidden></div><h1 id="LangGraph-：State、Node、Edge-的基本概念"><a href="#LangGraph-：State、Node、Edge-的基本概念" class="headerlink" title="LangGraph ：State、Node、Edge 的基本概念"></a>LangGraph ：State、Node、Edge 的基本概念</h1><blockquote>
+<p>之前我们使用langchain的时候，是一条线型的，输入 -》 步骤1 -&gt; 步骤2 -&gt; 步骤3 -&gt; 输出，如果你想要执行步骤2的时候回到步骤1， 进入一个循环那就不行了，因为我们知道Agent的核心是ReAct的模式，需要进入循环模式， 用户输入 -&gt; 思考 -&gt; 调用工具 -&gt; 查看结果 -&gt; 不够 -&gt; 继续调用工具-&gt; ♻️ -&gt; 输出， 但是线形的方式无法表达“往回调“的功能呢，那么我们就需要一个能允许循环的方式，那么这个方式就是图</p>
+</blockquote>
+<hr>
+<h2 id="一、LangGraph-是什么？一句话讲清楚"><a href="#一、LangGraph-是什么？一句话讲清楚" class="headerlink" title="一、LangGraph 是什么？一句话讲清楚"></a>一、LangGraph 是什么？一句话讲清楚</h2><p><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/assets/langgrap%E6%9E%B6%E6%9E%84.png" alt="langgrap架构"></p>
+<p>LangGraph 是 LangChain 团队开源的 <strong>有状态工作流编排框架</strong>。它把 Agent 的执行过程建模为一张有向图（Directed Graph）：</p>
+<ul>
+<li><strong>Node（节点）</strong> 负责干活——调 LLM、执行工具、跑业务逻辑</li>
+<li><strong>Edge（边）</strong> 负责调度——决定”下一步该走哪个节点”</li>
+<li><strong>State（状态）</strong> 负责通信——所有 Node 共享一份可读可写的状态数据</li>
+</ul>
+<p>三者配合的关系很简单：<strong>Node 读写 State，Edge 基于 State 决定流转方向</strong>。</p>
+<p>LangGraph 在 2025 年 10 月发布了稳定的 v1.0 版本（LTS），目前最新版本为 v1.2.x。如果你之前看过一些用 <code>set_entry_point()</code> 的老教程，那些是 v0.x 的 API，已经被废弃了。本文全部基于 v1.0+ 的稳定 API。</p>
+<hr>
+<h2 id="二、State：图的”共享内存”"><a href="#二、State：图的”共享内存”" class="headerlink" title="二、State：图的”共享内存”"></a>二、State：图的”共享内存”</h2><h3 id="2-1-概念"><a href="#2-1-概念" class="headerlink" title="2.1 概念"></a>2.1 概念</h3><p>State 是整张图的<strong>中央数据总线</strong>。每个 Node 在执行时都会拿到当前的 State 快照作为输入，执行完后返回一份 partial update，由框架负责合并回去。</p>
+<p>你可以把 State 理解成一个在所有节点之间流转的”信封”——每个节点打开信封读取内容，做完处理后把新的内容塞回去，再传给下一站。</p>
+<h3 id="2-2-定义-State-Schema"><a href="#2-2-定义-State-Schema" class="headerlink" title="2.2 定义 State Schema"></a>2.2 定义 State Schema</h3><p>State 的结构（Schema）支持三种定义方式：</p>
+<p><strong>方式一：TypedDict（最常用）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> TypedDict</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MyState</span>(<span class="title class_ inherited__">TypedDict</span>):</span><br><span class="line">    query: <span class="built_in">str</span></span><br><span class="line">    answer: <span class="built_in">str</span></span><br><span class="line">    step_count: <span class="built_in">int</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>方式二：Pydantic BaseModel（需要数据校验时）</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pydantic <span class="keyword">import</span> BaseModel</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MyState</span>(<span class="title class_ inherited__">BaseModel</span>):</span><br><span class="line">    query: <span class="built_in">str</span> = <span class="string">&quot;&quot;</span></span><br><span class="line">    answer: <span class="built_in">str</span> = <span class="string">&quot;&quot;</span></span><br><span class="line">    step_count: <span class="built_in">int</span> = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>方式三：dataclass</strong></p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> dataclasses <span class="keyword">import</span> dataclass</span><br><span class="line"></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MyState</span>:</span><br><span class="line">    query: <span class="built_in">str</span> = <span class="string">&quot;&quot;</span></span><br><span class="line">    answer: <span class="built_in">str</span> = <span class="string">&quot;&quot;</span></span><br><span class="line">    step_count: <span class="built_in">int</span> = <span class="number">0</span></span><br></pre></td></tr></table></figure>
+
+<p>三种方式功能上等价，<strong>TypedDict 是社区最广泛采用的方式</strong>，因为它足够轻量，也是官方文档的默认选择。</p>
+<h3 id="2-3-Channel（通道）：State-中的每个字段"><a href="#2-3-Channel（通道）：State-中的每个字段" class="headerlink" title="2.3 Channel（通道）：State 中的每个字段"></a>2.3 Channel（通道）：State 中的每个字段</h3><p>LangGraph 内部把 State 的每个字段称为 <strong>Channel</strong>。这不是什么高深概念，就是你在 TypedDict 里定义的每个 key。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">State</span>(<span class="title class_ inherited__">TypedDict</span>):</span><br><span class="line">    messages: <span class="built_in">list</span>       <span class="comment"># 这是一个 channel</span></span><br><span class="line">    step_count: <span class="built_in">int</span>      <span class="comment"># 这也是一个 channel</span></span><br></pre></td></tr></table></figure>
+
+<p>之所以叫 Channel 而不直接叫 field，是因为每个 Channel 可以单独配置<strong>更新策略</strong>（Reducer），这是 LangGraph 状态管理最核心的设计。</p>
+<h3 id="2-4-Reducer：解决并行写入冲突的关键"><a href="#2-4-Reducer：解决并行写入冲突的关键" class="headerlink" title="2.4 Reducer：解决并行写入冲突的关键"></a>2.4 Reducer：解决并行写入冲突的关键</h3><p>想象一个场景：Node A 和 Node B 同时并行运行，两者都想更新 <code>results</code> 字段。如果没有任何额外处理，后写入的就会覆盖先写入的——这就是 Race Condition。</p>
+<p><strong>Reducer 函数就是用来告诉 LangGraph：当多个 Node 同时更新同一个字段时，应该怎么合并。</strong></p>
+<p>使用 <code>Annotated</code> 来给字段绑定 Reducer：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> Annotated, TypedDict</span><br><span class="line"><span class="keyword">import</span> operator</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">State</span>(<span class="title class_ inherited__">TypedDict</span>):</span><br><span class="line">    <span class="comment"># 没有 Reducer：后写入的覆盖先写入的</span></span><br><span class="line">    current_answer: <span class="built_in">str</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 有 Reducer：用 operator.add 把多个列表拼接起来</span></span><br><span class="line">    results: Annotated[<span class="built_in">list</span>, operator.add]</span><br><span class="line">    </span><br><span class="line">    <span class="comment"># 有 Reducer：用 operator.add 把整数累加</span></span><br><span class="line">    step_count: Annotated[<span class="built_in">int</span>, operator.add]</span><br></pre></td></tr></table></figure>
+
+<p>常用的 Reducer 有：</p>
+<table>
+<thead>
+<tr>
+<th>Reducer</th>
+<th>用途</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>operator.add</code></td>
+<td>列表拼接 &#x2F; 整数累加</td>
+<td><code>[1] + [2] → [1, 2]</code> 或 <code>1 + 2 → 3</code></td>
+</tr>
+<tr>
+<td><code>operator.concat</code></td>
+<td>字符串拼接</td>
+<td><code>&quot;hello &quot; + &quot;world&quot; → &quot;hello world&quot;</code></td>
+</tr>
+<tr>
+<td><code>add_messages</code></td>
+<td>消息列表合并（带去重）</td>
+<td>自动按 message ID 去重，新消息追加</td>
+</tr>
+<tr>
+<td>自定义函数</td>
+<td>任意合并逻辑</td>
+<td><code>def reducer(old, new): return old + new</code></td>
+</tr>
+</tbody></table>
+<p><strong>自定义 Reducer 的签名</strong>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">my_reducer</span>(<span class="params">existing_value, new_value</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;</span></span><br><span class="line"><span class="string">    existing_value: 当前 State 中这个字段的值</span></span><br><span class="line"><span class="string">    new_value: Node 返回的更新值</span></span><br><span class="line"><span class="string">    返回值: 合并后的新值</span></span><br><span class="line"><span class="string">    &quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> existing_value + new_value</span><br></pre></td></tr></table></figure>
+
+<h3 id="2-5-MessagesState：对话场景的标配"><a href="#2-5-MessagesState：对话场景的标配" class="headerlink" title="2.5 MessagesState：对话场景的标配"></a>2.5 MessagesState：对话场景的标配</h3><p>在 Agent 应用里，最常见的 State 结构就是一个消息列表。LangGraph 为此提供了开箱即用的 <code>MessagesState</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> MessagesState</span><br><span class="line"></span><br><span class="line"><span class="comment"># MessagesState 自带一个 messages 字段，已经配好了 add_messages reducer</span></span><br><span class="line"><span class="comment"># 你可以直接继承它，再加自己的字段</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">State</span>(<span class="title class_ inherited__">MessagesState</span>):</span><br><span class="line">    documents: <span class="built_in">list</span>[<span class="built_in">str</span>]</span><br><span class="line">    current_tool: <span class="built_in">str</span></span><br></pre></td></tr></table></figure>
+
+<p><code>MessagesState</code> 内部等价于：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph.message <span class="keyword">import</span> add_messages</span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">MessagesState</span>(<span class="title class_ inherited__">TypedDict</span>):</span><br><span class="line">    messages: Annotated[<span class="built_in">list</span>[AnyMessage], add_messages]</span><br></pre></td></tr></table></figure>
+
+<p><code>add_messages</code> 这个 Reducer 比普通的列表拼接更聪明：它会根据 message ID 做去重。如果新消息的 ID 和已有消息重复，会更新而不是追加。</p>
+<h3 id="2-6-State-使用的核心规则"><a href="#2-6-State-使用的核心规则" class="headerlink" title="2.6 State 使用的核心规则"></a>2.6 State 使用的核心规则</h3><ol>
+<li><p><strong>Node 返回 partial update</strong>：Node 不需要返回完整的 State，只需要返回需要更新的字段</p>
+</li>
+<li><p><strong>没有 Reducer 的字段默认覆盖</strong>：所以并行场景下一定要给可能被并发写入的字段加 Reducer</p>
+</li>
+<li><p><strong>State 是不可变的输入</strong>：Node 拿到的 State 是当前快照的只读拷贝，修改它不会影响全局</p>
+<p><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/assets/state_reducer.png" alt="state_reducer"></p>
+</li>
+</ol>
+<hr>
+<h2 id="三、Node：图的”工人”"><a href="#三、Node：图的”工人”" class="headerlink" title="三、Node：图的”工人”"></a>三、Node：图的”工人”</h2><h3 id="3-1-概念"><a href="#3-1-概念" class="headerlink" title="3.1 概念"></a>3.1 概念</h3><p>Node 就是一个 <strong>Python 函数</strong>。它接收当前 State，做一些计算或副作用（调 LLM、访问数据库、执行工具），然后返回对 State 的更新。</p>
+<h3 id="3-2-Node-函数签名"><a href="#3-2-Node-函数签名" class="headerlink" title="3.2 Node 函数签名"></a>3.2 Node 函数签名</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 最简形式：只接收 state</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">my_node</span>(<span class="params">state: State</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;answer&quot;</span>: <span class="string">&quot;处理完成&quot;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 带配置：接收 state + config</span></span><br><span class="line"><span class="keyword">from</span> langchain_core.runnables <span class="keyword">import</span> RunnableConfig</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">my_node</span>(<span class="params">state: State, config: RunnableConfig</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    thread_id = config[<span class="string">&quot;configurable&quot;</span>][<span class="string">&quot;thread_id&quot;</span>]</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;answer&quot;</span>: <span class="string">f&quot;Thread <span class="subst">&#123;thread_id&#125;</span> 处理完成&quot;</span>&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 带运行时上下文（v1.0+）：接收 state + config + runtime</span></span><br><span class="line"><span class="keyword">from</span> langgraph.runtime <span class="keyword">import</span> Runtime</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">my_node</span>(<span class="params">state: State, config: RunnableConfig, runtime: Runtime</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="comment"># runtime 提供 store, stream_writer 等</span></span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;answer&quot;</span>: <span class="string">&quot;处理完成&quot;</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-3-注册-Node"><a href="#3-3-注册-Node" class="headerlink" title="3.3 注册 Node"></a>3.3 注册 Node</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph</span><br><span class="line"></span><br><span class="line">graph = StateGraph(State)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方式一：函数名自动作为 node 名</span></span><br><span class="line">graph.add_node(my_node)  <span class="comment"># node 名 = &quot;my_node&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 方式二：显式指定 node 名</span></span><br><span class="line">graph.add_node(<span class="string">&quot;processor&quot;</span>, my_node)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 方式三：用 @dataclass 注解（v1.0 新特性）</span></span><br><span class="line"><span class="meta">@dataclass</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">ProcessorNode</span>:</span><br><span class="line">    model: <span class="built_in">str</span> = <span class="string">&quot;gpt-4o&quot;</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">def</span> <span class="title function_">__call__</span>(<span class="params">self, state: State, config: RunnableConfig</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">        <span class="comment"># 可以用 self.model 访问配置</span></span><br><span class="line">        <span class="keyword">return</span> &#123;<span class="string">&quot;answer&quot;</span>: <span class="string">&quot;处理完成&quot;</span>&#125;</span><br><span class="line"></span><br><span class="line">graph.add_node(<span class="string">&quot;processor&quot;</span>, ProcessorNode(model=<span class="string">&quot;gpt-4o&quot;</span>))</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-4-Node-的返回值"><a href="#3-4-Node-的返回值" class="headerlink" title="3.4 Node 的返回值"></a>3.4 Node 的返回值</h3><p>Node 返回一个字典（dict），key 对应 State 中的 channel 名，value 是要更新的值， 这个不需要定义返回State是因为langchain会帮你做合并这一步，你只需要提供下修改的那几个值就好了</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">search_node</span>(<span class="params">state: State</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="comment"># 只更新 documents 字段，其他字段不变</span></span><br><span class="line">    docs = do_search(state[<span class="string">&quot;query&quot;</span>])</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;documents&quot;</span>: docs&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">llm_node</span>(<span class="params">state: State</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="comment"># 同时更新多个字段</span></span><br><span class="line">    response = llm.invoke(state[<span class="string">&quot;messages&quot;</span>])</span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">        <span class="string">&quot;messages&quot;</span>: [response],</span><br><span class="line">        <span class="string">&quot;step_count&quot;</span>: <span class="number">1</span>   <span class="comment"># 如果 step_count 有 operator.add reducer，会累加</span></span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-5-几种典型的-Node-类型"><a href="#3-5-几种典型的-Node-类型" class="headerlink" title="3.5 几种典型的 Node 类型"></a>3.5 几种典型的 Node 类型</h3><p>从功能角度看，Node 通常分为这几类：</p>
+<p><strong>LLM Node</strong>——调用大模型</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">call_llm</span>(<span class="params">state: State</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    response = ChatOpenAI(model=<span class="string">&quot;gpt-4o&quot;</span>).invoke(state[<span class="string">&quot;messages&quot;</span>])</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;messages&quot;</span>: [response]&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>Tool Node</strong>——执行工具调用</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">call_tool</span>(<span class="params">state: State</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    last_message = state[<span class="string">&quot;messages&quot;</span>][-<span class="number">1</span>]</span><br><span class="line">    tool_results = []</span><br><span class="line">    <span class="keyword">for</span> tool_call <span class="keyword">in</span> last_message.tool_calls:</span><br><span class="line">        result = tools_by_name[tool_call[<span class="string">&quot;name&quot;</span>]].invoke(tool_call[<span class="string">&quot;args&quot;</span>])</span><br><span class="line">        tool_results.append(ToolMessage(</span><br><span class="line">            content=<span class="built_in">str</span>(result),</span><br><span class="line">            tool_call_id=tool_call[<span class="string">&quot;id&quot;</span>]</span><br><span class="line">        ))</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;messages&quot;</span>: tool_results&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>Logic Node</strong>——纯业务逻辑</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">def</span> <span class="title function_">validate_input</span>(<span class="params">state: State</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">len</span>(state[<span class="string">&quot;query&quot;</span>]) &lt; <span class="number">5</span>:</span><br><span class="line">        <span class="keyword">return</span> &#123;<span class="string">&quot;error&quot;</span>: <span class="string">&quot;查询太短&quot;</span>, <span class="string">&quot;is_valid&quot;</span>: <span class="literal">False</span>&#125;</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;is_valid&quot;</span>: <span class="literal">True</span>&#125;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="四、Edge：图的”交通信号灯”"><a href="#四、Edge：图的”交通信号灯”" class="headerlink" title="四、Edge：图的”交通信号灯”"></a>四、Edge：图的”交通信号灯”</h2><p><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" data-lazy-src="/assets/edge.png" alt="edge"></p>
+<h3 id="4-1-概念"><a href="#4-1-概念" class="headerlink" title="4.1 概念"></a>4.1 概念</h3><p>Edge 定义了节点之间的<strong>流转规则</strong>。如果说 Node 是”做什么”，那 Edge 就是”做完之后去哪里”。</p>
+<p>LangGraph 提供了四种 Edge 机制，按复杂度递增：</p>
+<h3 id="4-2-普通-Edge：固定跳转"><a href="#4-2-普通-Edge：固定跳转" class="headerlink" title="4.2 普通 Edge：固定跳转"></a>4.2 普通 Edge：固定跳转</h3><p>最简单的情况——A 做完一定去 B。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> START, END</span><br><span class="line"></span><br><span class="line"><span class="comment"># 从虚拟起点到第一个节点</span></span><br><span class="line">graph.add_edge(START, <span class="string">&quot;parse_input&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 节点之间的固定跳转</span></span><br><span class="line">graph.add_edge(<span class="string">&quot;parse_input&quot;</span>, <span class="string">&quot;call_llm&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 最后一个节点到虚拟终点</span></span><br><span class="line">graph.add_edge(<span class="string">&quot;call_llm&quot;</span>, END)</span><br></pre></td></tr></table></figure>
+
+<p><code>START</code> 和 <code>END</code> 是 LangGraph 的两个虚拟节点：</p>
+<ul>
+<li><code>START</code>：图的入口，<code>invoke()</code> 调用时从这里开始</li>
+<li><code>END</code>：图的出口，走到这里整个图就执行完毕</li>
+</ul>
+<h3 id="4-3-条件-Edge：动态路由"><a href="#4-3-条件-Edge：动态路由" class="headerlink" title="4.3 条件 Edge：动态路由"></a>4.3 条件 Edge：动态路由</h3><p>根据当前 State 的内容，决定下一步去哪个节点。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> <span class="type">Literal</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">route_after_llm</span>(<span class="params">state: State</span>) -&gt; <span class="type">Literal</span>[<span class="string">&quot;call_tool&quot;</span>, <span class="string">&quot;respond&quot;</span>, <span class="string">&quot;__end__&quot;</span>]:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;路由函数：读取 state，返回下一个节点的名字&quot;&quot;&quot;</span></span><br><span class="line">    last_message = state[<span class="string">&quot;messages&quot;</span>][-<span class="number">1</span>]</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">hasattr</span>(last_message, <span class="string">&quot;tool_calls&quot;</span>) <span class="keyword">and</span> last_message.tool_calls:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;call_tool&quot;</span></span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;__end__&quot;</span>   <span class="comment"># &quot;__end__&quot; 等价于 END</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 注册条件 Edge</span></span><br><span class="line">graph.add_conditional_edges(</span><br><span class="line">    <span class="string">&quot;call_llm&quot;</span>,          <span class="comment"># 从哪个节点出发</span></span><br><span class="line">    route_after_llm      <span class="comment"># 路由函数</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 也可以显式指定路由映射（可读性更好）</span></span><br><span class="line">graph.add_conditional_edges(</span><br><span class="line">    <span class="string">&quot;call_llm&quot;</span>,</span><br><span class="line">    route_after_llm,</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="string">&quot;call_tool&quot;</span>: <span class="string">&quot;tool_executor&quot;</span>,</span><br><span class="line">        <span class="string">&quot;respond&quot;</span>: <span class="string">&quot;format_response&quot;</span>,</span><br><span class="line">        <span class="string">&quot;__end__&quot;</span>: END</span><br><span class="line">    &#125;</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p><strong>条件入口</strong>：从 START 就开始分支</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">graph.add_conditional_edges(START, route_by_intent, &#123;</span><br><span class="line">    <span class="string">&quot;chat&quot;</span>: <span class="string">&quot;chat_node&quot;</span>,</span><br><span class="line">    <span class="string">&quot;search&quot;</span>: <span class="string">&quot;search_node&quot;</span>,</span><br><span class="line">    <span class="string">&quot;code&quot;</span>: <span class="string">&quot;code_node&quot;</span></span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<h3 id="4-4-Command：路由-状态更新一步到位"><a href="#4-4-Command：路由-状态更新一步到位" class="headerlink" title="4.4 Command：路由 + 状态更新一步到位"></a>4.4 Command：路由 + 状态更新一步到位</h3><p>v1.0 引入的 <code>Command</code> 是一个很实用的原语。传统做法中，如果你想在路由的同时更新 State，需要把更新逻辑放在 Node 里、路由逻辑放在 Edge 的路由函数里——分成两个地方维护。<code>Command</code> 让你在一个 Node 函数里同时完成这两件事：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.types <span class="keyword">import</span> Command</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">my_node</span>(<span class="params">state: State</span>) -&gt; Command:</span><br><span class="line">    <span class="comment"># 同时做路由和状态更新</span></span><br><span class="line">    <span class="keyword">if</span> state[<span class="string">&quot;need_review&quot;</span>]:</span><br><span class="line">        <span class="keyword">return</span> Command(</span><br><span class="line">            goto=<span class="string">&quot;review_node&quot;</span>,</span><br><span class="line">            update=&#123;<span class="string">&quot;status&quot;</span>: <span class="string">&quot;pending_review&quot;</span>&#125;</span><br><span class="line">        )</span><br><span class="line">    <span class="keyword">else</span>:</span><br><span class="line">        <span class="keyword">return</span> Command(</span><br><span class="line">            goto=<span class="string">&quot;publish_node&quot;</span>,</span><br><span class="line">            update=&#123;<span class="string">&quot;status&quot;</span>: <span class="string">&quot;approved&quot;</span>&#125;</span><br><span class="line">        )</span><br></pre></td></tr></table></figure>
+
+<p>使用 <code>Command</code> 时，不需要再为这个 Node 注册条件 Edge——路由逻辑已经内嵌在返回值里了。</p>
+<h3 id="4-5-Send：动态扇出（Map-Reduce）"><a href="#4-5-Send：动态扇出（Map-Reduce）" class="headerlink" title="4.5 Send：动态扇出（Map-Reduce）"></a>4.5 Send：动态扇出（Map-Reduce）</h3><p>当你需要把一个列表中的每个元素分别发送给同一个 Node 并行处理时，<code>Send</code> 就派上用场了。典型场景：生成了 N 个主题，要对每个主题分别调用 LLM 生成内容。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> langgraph.types <span class="keyword">import</span> Send</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">fan_out</span>(<span class="params">state: State</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;条件 Edge 的路由函数，返回 Send 列表&quot;&quot;&quot;</span></span><br><span class="line">    <span class="keyword">return</span> [</span><br><span class="line">        Send(<span class="string">&quot;generate_content&quot;</span>, &#123;<span class="string">&quot;topic&quot;</span>: topic&#125;)</span><br><span class="line">        <span class="keyword">for</span> topic <span class="keyword">in</span> state[<span class="string">&quot;topics&quot;</span>]</span><br><span class="line">    ]</span><br><span class="line"></span><br><span class="line">graph.add_conditional_edges(<span class="string">&quot;generate_topics&quot;</span>, fan_out)</span><br></pre></td></tr></table></figure>
+
+<p><code>Send</code> 接收两个参数：目标 Node 名称 + 传给该 Node 的 State。每个 Send 会创建一个独立的执行分支。</p>
+<hr>
+<h2 id="五、编译与执行：从-Builder-到-Runner"><a href="#五、编译与执行：从-Builder-到-Runner" class="headerlink" title="五、编译与执行：从 Builder 到 Runner"></a>五、编译与执行：从 Builder 到 Runner</h2><h3 id="5-1-compile-：把蓝图变成可执行对象"><a href="#5-1-compile-：把蓝图变成可执行对象" class="headerlink" title="5.1 compile()：把蓝图变成可执行对象"></a>5.1 compile()：把蓝图变成可执行对象</h3><p><code>StateGraph</code> 本身只是一个 Builder——你用它来注册 Node 和 Edge。真正可以运行的是 <code>compile()</code> 之后返回的 <code>CompiledStateGraph</code>。</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 基础编译</span></span><br><span class="line">app = graph.<span class="built_in">compile</span>()</span><br><span class="line"></span><br><span class="line"><span class="comment"># 带持久化的编译（支持多轮对话记忆）</span></span><br><span class="line"><span class="keyword">from</span> langgraph.checkpoint.memory <span class="keyword">import</span> InMemorySaver</span><br><span class="line"></span><br><span class="line">checkpointer = InMemorySaver()</span><br><span class="line">app = graph.<span class="built_in">compile</span>(checkpointer=checkpointer)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 带断点的编译（Human-in-the-loop）</span></span><br><span class="line">app = graph.<span class="built_in">compile</span>(</span><br><span class="line">    checkpointer=checkpointer,</span><br><span class="line">    interrupt_before=[<span class="string">&quot;sensitive_action&quot;</span>]</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<p>编译时会做一些基础校验：检查有没有孤立节点、Edge 引用的节点是否存在等等。</p>
+<h3 id="5-2-invoke-：同步执行"><a href="#5-2-invoke-：同步执行" class="headerlink" title="5.2 invoke()：同步执行"></a>5.2 invoke()：同步执行</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">result = app.invoke(</span><br><span class="line">    &#123;<span class="string">&quot;messages&quot;</span>: [HumanMessage(content=<span class="string">&quot;今天天气怎么样？&quot;</span>)]&#125;,</span><br><span class="line">    config=&#123;<span class="string">&quot;configurable&quot;</span>: &#123;<span class="string">&quot;thread_id&quot;</span>: <span class="string">&quot;user-123&quot;</span>&#125;&#125;</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="5-3-stream-：流式执行"><a href="#5-3-stream-：流式执行" class="headerlink" title="5.3 stream()：流式执行"></a>5.3 stream()：流式执行</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> event <span class="keyword">in</span> app.stream(</span><br><span class="line">    &#123;<span class="string">&quot;messages&quot;</span>: [HumanMessage(content=<span class="string">&quot;帮我写一篇文章&quot;</span>)]&#125;,</span><br><span class="line">    config=&#123;<span class="string">&quot;configurable&quot;</span>: &#123;<span class="string">&quot;thread_id&quot;</span>: <span class="string">&quot;user-123&quot;</span>&#125;&#125;</span><br><span class="line">):</span><br><span class="line">    <span class="built_in">print</span>(event)</span><br></pre></td></tr></table></figure>
+
+<p>stream 模式下，每个 Node 执行完都会 yield 一个事件，适合需要实时反馈的场景（比如聊天界面逐步展示思考过程）。</p>
+<h3 id="5-4-异步版本"><a href="#5-4-异步版本" class="headerlink" title="5.4 异步版本"></a>5.4 异步版本</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># ainvoke</span></span><br><span class="line">result = <span class="keyword">await</span> app.ainvoke(&#123;<span class="string">&quot;messages&quot;</span>: [...]&#125;)</span><br><span class="line"></span><br><span class="line"><span class="comment"># astream</span></span><br><span class="line"><span class="keyword">async</span> <span class="keyword">for</span> event <span class="keyword">in</span> app.astream(&#123;<span class="string">&quot;messages&quot;</span>: [...]&#125;):</span><br><span class="line">    <span class="built_in">print</span>(event)</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="六、完整示例：一个带工具调用的-ReAct-Agent"><a href="#六、完整示例：一个带工具调用的-ReAct-Agent" class="headerlink" title="六、完整示例：一个带工具调用的 ReAct Agent"></a>六、完整示例：一个带工具调用的 ReAct Agent</h2><p>把前面所有概念串起来，实现一个最基本的 ReAct Agent：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> typing <span class="keyword">import</span> Annotated, <span class="type">Literal</span></span><br><span class="line"><span class="keyword">from</span> typing_extensions <span class="keyword">import</span> TypedDict</span><br><span class="line"></span><br><span class="line"><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI</span><br><span class="line"><span class="keyword">from</span> langchain_core.messages <span class="keyword">import</span> HumanMessage, BaseMessage, ToolMessage</span><br><span class="line"><span class="keyword">from</span> langgraph.graph <span class="keyword">import</span> StateGraph, START, END, MessagesState</span><br><span class="line"><span class="keyword">from</span> langgraph.graph.message <span class="keyword">import</span> add_messages</span><br><span class="line"><span class="keyword">from</span> langgraph.checkpoint.memory <span class="keyword">import</span> InMemorySaver</span><br><span class="line"></span><br><span class="line"><span class="comment"># ========== 1. 定义 State ==========</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">AgentState</span>(<span class="title class_ inherited__">MessagesState</span>):</span><br><span class="line">    <span class="string">&quot;&quot;&quot;继承 MessagesState 自带 messages 字段 + add_messages reducer&quot;&quot;&quot;</span></span><br><span class="line">    tool_call_count: Annotated[<span class="built_in">int</span>, <span class="keyword">lambda</span> a, b: a + b]</span><br><span class="line"></span><br><span class="line"><span class="comment"># ========== 2. 定义 Node ==========</span></span><br><span class="line"></span><br><span class="line">llm = ChatOpenAI(model=<span class="string">&quot;gpt-4o&quot;</span>, temperature=<span class="number">0</span>)</span><br><span class="line">llm_with_tools = llm.bind_tools([...])  <span class="comment"># 绑定你的工具</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">call_model</span>(<span class="params">state: AgentState</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;LLM Node：调用模型&quot;&quot;&quot;</span></span><br><span class="line">    response = llm_with_tools.invoke(state[<span class="string">&quot;messages&quot;</span>])</span><br><span class="line">    <span class="keyword">return</span> &#123;<span class="string">&quot;messages&quot;</span>: [response]&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">call_tools</span>(<span class="params">state: AgentState</span>) -&gt; <span class="built_in">dict</span>:</span><br><span class="line">    <span class="string">&quot;&quot;&quot;Tool Node：执行工具调用&quot;&quot;&quot;</span></span><br><span class="line">    last_msg = state[<span class="string">&quot;messages&quot;</span>][-<span class="number">1</span>]</span><br><span class="line">    results = []</span><br><span class="line">    <span class="keyword">for</span> tc <span class="keyword">in</span> last_msg.tool_calls:</span><br><span class="line">        result = tools_by_name[tc[<span class="string">&quot;name&quot;</span>]].invoke(tc[<span class="string">&quot;args&quot;</span>])</span><br><span class="line">        results.append(ToolMessage(</span><br><span class="line">            content=<span class="built_in">str</span>(result),</span><br><span class="line">            tool_call_id=tc[<span class="string">&quot;id&quot;</span>]</span><br><span class="line">        ))</span><br><span class="line">    <span class="keyword">return</span> &#123;</span><br><span class="line">        <span class="string">&quot;messages&quot;</span>: results,</span><br><span class="line">        <span class="string">&quot;tool_call_count&quot;</span>: <span class="built_in">len</span>(results)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># ========== 3. 定义路由函数 ==========</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">should_continue</span>(<span class="params">state: AgentState</span>) -&gt; <span class="type">Literal</span>[<span class="string">&quot;call_tools&quot;</span>, <span class="string">&quot;__end__&quot;</span>]:</span><br><span class="line">    last_msg = state[<span class="string">&quot;messages&quot;</span>][-<span class="number">1</span>]</span><br><span class="line">    <span class="keyword">if</span> <span class="built_in">hasattr</span>(last_msg, <span class="string">&quot;tool_calls&quot;</span>) <span class="keyword">and</span> last_msg.tool_calls:</span><br><span class="line">        <span class="keyword">return</span> <span class="string">&quot;call_tools&quot;</span></span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;__end__&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># ========== 4. 组装 Graph ==========</span></span><br><span class="line"></span><br><span class="line">graph = StateGraph(AgentState)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 注册 Node</span></span><br><span class="line">graph.add_node(<span class="string">&quot;call_model&quot;</span>, call_model)</span><br><span class="line">graph.add_node(<span class="string">&quot;call_tools&quot;</span>, call_tools)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 注册 Edge</span></span><br><span class="line">graph.add_edge(START, <span class="string">&quot;call_model&quot;</span>)</span><br><span class="line">graph.add_conditional_edges(<span class="string">&quot;call_model&quot;</span>, should_continue)</span><br><span class="line">graph.add_edge(<span class="string">&quot;call_tools&quot;</span>, <span class="string">&quot;call_model&quot;</span>)   <span class="comment"># 工具执行完回到 LLM</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># ========== 5. 编译 &amp; 执行 ==========</span></span><br><span class="line"></span><br><span class="line">checkpointer = InMemorySaver()</span><br><span class="line">app = graph.<span class="built_in">compile</span>(checkpointer=checkpointer)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 运行</span></span><br><span class="line">result = app.invoke(</span><br><span class="line">    &#123;<span class="string">&quot;messages&quot;</span>: [HumanMessage(content=<span class="string">&quot;北京今天天气怎么样？&quot;</span>)]&#125;,</span><br><span class="line">    config=&#123;<span class="string">&quot;configurable&quot;</span>: &#123;<span class="string">&quot;thread_id&quot;</span>: <span class="string">&quot;demo-001&quot;</span>&#125;&#125;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="built_in">print</span>(result[<span class="string">&quot;messages&quot;</span>][-<span class="number">1</span>].content)</span><br></pre></td></tr></table></figure>
+
+<p>这个例子的执行流程是：</p>
+<ol>
+<li><code>START</code> → <code>call_model</code>：LLM 分析用户输入</li>
+<li><code>call_model</code> → 条件判断：如果 LLM 返回了 tool_calls，走 <code>call_tools</code>；否则走 <code>END</code></li>
+<li><code>call_tools</code> → <code>call_model</code>：工具结果返回给 LLM 继续推理</li>
+<li>循环直到 LLM 不再需要调用工具，输出最终回答</li>
+</ol>
+<p>这就是经典的 <strong>ReAct 循环</strong>：Reason → Act → Observe → Reason → …</p>
+<hr>
+<h2 id="七、API-速查表"><a href="#七、API-速查表" class="headerlink" title="七、API 速查表"></a>七、API 速查表</h2><h3 id="State-相关"><a href="#State-相关" class="headerlink" title="State 相关"></a>State 相关</h3><table>
+<thead>
+<tr>
+<th>API</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>TypedDict</code></td>
+<td>定义 State Schema（最常用）</td>
+</tr>
+<tr>
+<td><code>Annotated[type, reducer]</code></td>
+<td>给字段绑定 Reducer</td>
+</tr>
+<tr>
+<td><code>operator.add</code></td>
+<td>内置 Reducer：列表拼接 &#x2F; 数值累加</td>
+</tr>
+<tr>
+<td><code>add_messages</code></td>
+<td>内置 Reducer：消息列表智能合并</td>
+</tr>
+<tr>
+<td><code>MessagesState</code></td>
+<td>预置的带 messages 字段的 State 基类</td>
+</tr>
+</tbody></table>
+<h3 id="Graph-构建"><a href="#Graph-构建" class="headerlink" title="Graph 构建"></a>Graph 构建</h3><table>
+<thead>
+<tr>
+<th>API</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>StateGraph(State)</code></td>
+<td>创建图构建器</td>
+</tr>
+<tr>
+<td><code>graph.add_node(name, fn)</code></td>
+<td>注册节点</td>
+</tr>
+<tr>
+<td><code>graph.add_edge(a, b)</code></td>
+<td>添加固定跳转</td>
+</tr>
+<tr>
+<td><code>graph.add_conditional_edges(src, fn, mapping)</code></td>
+<td>添加条件路由</td>
+</tr>
+<tr>
+<td><code>graph.compile()</code></td>
+<td>编译为可执行图</td>
+</tr>
+</tbody></table>
+<h3 id="特殊节点-类型"><a href="#特殊节点-类型" class="headerlink" title="特殊节点 &amp; 类型"></a>特殊节点 &amp; 类型</h3><table>
+<thead>
+<tr>
+<th>API</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>START</code></td>
+<td>虚拟起始节点</td>
+</tr>
+<tr>
+<td><code>END</code></td>
+<td>虚拟结束节点</td>
+</tr>
+<tr>
+<td><code>Command(goto, update)</code></td>
+<td>路由 + 状态更新二合一</td>
+</tr>
+<tr>
+<td><code>Send(node_name, state)</code></td>
+<td>动态扇出，用于 Map-Reduce</td>
+</tr>
+</tbody></table>
+<h3 id="执行方法"><a href="#执行方法" class="headerlink" title="执行方法"></a>执行方法</h3><table>
+<thead>
+<tr>
+<th>API</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>app.invoke(input, config)</code></td>
+<td>同步执行，返回最终 State</td>
+</tr>
+<tr>
+<td><code>app.stream(input, config)</code></td>
+<td>流式执行，逐步 yield 事件</td>
+</tr>
+<tr>
+<td><code>app.ainvoke(input, config)</code></td>
+<td>异步同步执行</td>
+</tr>
+<tr>
+<td><code>app.astream(input, config)</code></td>
+<td>异步流式执行</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="八、常踩的坑"><a href="#八、常踩的坑" class="headerlink" title="八、常踩的坑"></a>八、常踩的坑</h2><p><strong>1. 并行节点不加 Reducer 导致数据丢失</strong></p>
+<p>如果两个 Node 同时从 START 出发并行执行，都更新同一个字段但没有 Reducer，后执行完的会覆盖前一个的结果。解决方案很简单：给并发写入的字段加 <code>Annotated[list, operator.add]</code>。</p>
+<p><strong>2. 条件 Edge 的路由函数返回值和 mapping 对不上</strong></p>
+<p><code>add_conditional_edges</code> 的 mapping 字典里必须包含路由函数所有可能的返回值，漏掉一个就会在运行时报错。建议用 <code>Literal</code> 类型注解来约束返回值。</p>
+<p><strong>3. 忘记 compile()</strong></p>
+<p><code>StateGraph</code> 是 Builder，不能直接调用 <code>invoke()</code>。必须先 <code>compile()</code> 得到 <code>CompiledStateGraph</code> 才能执行。</p>
+<p><strong>4. Node 里直接修改 state 对象</strong></p>
+<p>State 是只读快照，在 Node 里做 <code>state[&quot;messages&quot;].append(...)</code> 不会生效。正确做法是通过返回值来更新。</p>
+<p><strong>5. 混用普通 Edge 和条件 Edge</strong></p>
+<p>同一个源节点不要既加 <code>add_edge</code> 又加 <code>add_conditional_edges</code>，两条路径可能同时触发，产生非预期行为。</p>
+<hr>
+<h2 id="九、小结"><a href="#九、小结" class="headerlink" title="九、小结"></a>九、小结</h2><p>LangGraph 的设计哲学可以用一句话概括：<strong>用图的思维来编排 Agent 的执行流程</strong>。</p>
+<p>State 提供了节点间通信的统一机制，Reducer 解决了并行写入的冲突问题；Node 是纯粹的计算单元，可以是任意 Python 函数；Edge 把这些计算单元串联成有意义的工作流，支持固定跳转、条件路由、动态扇出等多种模式。</p>
+<p>掌握了这三个核心概念，你就掌握了 LangGraph 80% 的能力。剩下的 20%（Checkpointer 持久化、Human-in-the-loop、子图嵌套等）都是在这个基础上的扩展，有了扎实的基础，上手会很快。</p>
+<p>建议的学习路径：先动手跑通本文的 ReAct Agent 示例，然后逐步加入 Checkpointer 实现多轮对话，最后尝试用条件 Edge 和 Send 构建更复杂的多 Agent 协作系统。</p>
+</article><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/langchain/">langchain</a></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width no-desc" href="/2026/04/21/Mysql%E7%9A%84%E7%B4%A2%E5%BC%95/" title="Mysql的索引"><div class="cover" style="background: linear-gradient(135deg, #0f172a 0%, #0c4a6e 50%, #22d3ee 100%)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">Mysql的索引</div></div></div></a></nav></div><div class="aside-content" id="aside-content"><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content is-expand"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#LangGraph-%EF%BC%9AState%E3%80%81Node%E3%80%81Edge-%E7%9A%84%E5%9F%BA%E6%9C%AC%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">LangGraph ：State、Node、Edge 的基本概念</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81LangGraph-%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F%E4%B8%80%E5%8F%A5%E8%AF%9D%E8%AE%B2%E6%B8%85%E6%A5%9A"><span class="toc-number">1.1.</span> <span class="toc-text">一、LangGraph 是什么？一句话讲清楚</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81State%EF%BC%9A%E5%9B%BE%E7%9A%84%E2%80%9D%E5%85%B1%E4%BA%AB%E5%86%85%E5%AD%98%E2%80%9D"><span class="toc-number">1.2.</span> <span class="toc-text">二、State：图的”共享内存”</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#2-1-%E6%A6%82%E5%BF%B5"><span class="toc-number">1.2.1.</span> <span class="toc-text">2.1 概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-2-%E5%AE%9A%E4%B9%89-State-Schema"><span class="toc-number">1.2.2.</span> <span class="toc-text">2.2 定义 State Schema</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-3-Channel%EF%BC%88%E9%80%9A%E9%81%93%EF%BC%89%EF%BC%9AState-%E4%B8%AD%E7%9A%84%E6%AF%8F%E4%B8%AA%E5%AD%97%E6%AE%B5"><span class="toc-number">1.2.3.</span> <span class="toc-text">2.3 Channel（通道）：State 中的每个字段</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-4-Reducer%EF%BC%9A%E8%A7%A3%E5%86%B3%E5%B9%B6%E8%A1%8C%E5%86%99%E5%85%A5%E5%86%B2%E7%AA%81%E7%9A%84%E5%85%B3%E9%94%AE"><span class="toc-number">1.2.4.</span> <span class="toc-text">2.4 Reducer：解决并行写入冲突的关键</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-5-MessagesState%EF%BC%9A%E5%AF%B9%E8%AF%9D%E5%9C%BA%E6%99%AF%E7%9A%84%E6%A0%87%E9%85%8D"><span class="toc-number">1.2.5.</span> <span class="toc-text">2.5 MessagesState：对话场景的标配</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-6-State-%E4%BD%BF%E7%94%A8%E7%9A%84%E6%A0%B8%E5%BF%83%E8%A7%84%E5%88%99"><span class="toc-number">1.2.6.</span> <span class="toc-text">2.6 State 使用的核心规则</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81Node%EF%BC%9A%E5%9B%BE%E7%9A%84%E2%80%9D%E5%B7%A5%E4%BA%BA%E2%80%9D"><span class="toc-number">1.3.</span> <span class="toc-text">三、Node：图的”工人”</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#3-1-%E6%A6%82%E5%BF%B5"><span class="toc-number">1.3.1.</span> <span class="toc-text">3.1 概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-2-Node-%E5%87%BD%E6%95%B0%E7%AD%BE%E5%90%8D"><span class="toc-number">1.3.2.</span> <span class="toc-text">3.2 Node 函数签名</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-3-%E6%B3%A8%E5%86%8C-Node"><span class="toc-number">1.3.3.</span> <span class="toc-text">3.3 注册 Node</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-4-Node-%E7%9A%84%E8%BF%94%E5%9B%9E%E5%80%BC"><span class="toc-number">1.3.4.</span> <span class="toc-text">3.4 Node 的返回值</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-5-%E5%87%A0%E7%A7%8D%E5%85%B8%E5%9E%8B%E7%9A%84-Node-%E7%B1%BB%E5%9E%8B"><span class="toc-number">1.3.5.</span> <span class="toc-text">3.5 几种典型的 Node 类型</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81Edge%EF%BC%9A%E5%9B%BE%E7%9A%84%E2%80%9D%E4%BA%A4%E9%80%9A%E4%BF%A1%E5%8F%B7%E7%81%AF%E2%80%9D"><span class="toc-number">1.4.</span> <span class="toc-text">四、Edge：图的”交通信号灯”</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#4-1-%E6%A6%82%E5%BF%B5"><span class="toc-number">1.4.1.</span> <span class="toc-text">4.1 概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-2-%E6%99%AE%E9%80%9A-Edge%EF%BC%9A%E5%9B%BA%E5%AE%9A%E8%B7%B3%E8%BD%AC"><span class="toc-number">1.4.2.</span> <span class="toc-text">4.2 普通 Edge：固定跳转</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-3-%E6%9D%A1%E4%BB%B6-Edge%EF%BC%9A%E5%8A%A8%E6%80%81%E8%B7%AF%E7%94%B1"><span class="toc-number">1.4.3.</span> <span class="toc-text">4.3 条件 Edge：动态路由</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-4-Command%EF%BC%9A%E8%B7%AF%E7%94%B1-%E7%8A%B6%E6%80%81%E6%9B%B4%E6%96%B0%E4%B8%80%E6%AD%A5%E5%88%B0%E4%BD%8D"><span class="toc-number">1.4.4.</span> <span class="toc-text">4.4 Command：路由 + 状态更新一步到位</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-5-Send%EF%BC%9A%E5%8A%A8%E6%80%81%E6%89%87%E5%87%BA%EF%BC%88Map-Reduce%EF%BC%89"><span class="toc-number">1.4.5.</span> <span class="toc-text">4.5 Send：动态扇出（Map-Reduce）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81%E7%BC%96%E8%AF%91%E4%B8%8E%E6%89%A7%E8%A1%8C%EF%BC%9A%E4%BB%8E-Builder-%E5%88%B0-Runner"><span class="toc-number">1.5.</span> <span class="toc-text">五、编译与执行：从 Builder 到 Runner</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#5-1-compile-%EF%BC%9A%E6%8A%8A%E8%93%9D%E5%9B%BE%E5%8F%98%E6%88%90%E5%8F%AF%E6%89%A7%E8%A1%8C%E5%AF%B9%E8%B1%A1"><span class="toc-number">1.5.1.</span> <span class="toc-text">5.1 compile()：把蓝图变成可执行对象</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-2-invoke-%EF%BC%9A%E5%90%8C%E6%AD%A5%E6%89%A7%E8%A1%8C"><span class="toc-number">1.5.2.</span> <span class="toc-text">5.2 invoke()：同步执行</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-3-stream-%EF%BC%9A%E6%B5%81%E5%BC%8F%E6%89%A7%E8%A1%8C"><span class="toc-number">1.5.3.</span> <span class="toc-text">5.3 stream()：流式执行</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-4-%E5%BC%82%E6%AD%A5%E7%89%88%E6%9C%AC"><span class="toc-number">1.5.4.</span> <span class="toc-text">5.4 异步版本</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81%E5%AE%8C%E6%95%B4%E7%A4%BA%E4%BE%8B%EF%BC%9A%E4%B8%80%E4%B8%AA%E5%B8%A6%E5%B7%A5%E5%85%B7%E8%B0%83%E7%94%A8%E7%9A%84-ReAct-Agent"><span class="toc-number">1.6.</span> <span class="toc-text">六、完整示例：一个带工具调用的 ReAct Agent</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81API-%E9%80%9F%E6%9F%A5%E8%A1%A8"><span class="toc-number">1.7.</span> <span class="toc-text">七、API 速查表</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#State-%E7%9B%B8%E5%85%B3"><span class="toc-number">1.7.1.</span> <span class="toc-text">State 相关</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Graph-%E6%9E%84%E5%BB%BA"><span class="toc-number">1.7.2.</span> <span class="toc-text">Graph 构建</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E7%89%B9%E6%AE%8A%E8%8A%82%E7%82%B9-%E7%B1%BB%E5%9E%8B"><span class="toc-number">1.7.3.</span> <span class="toc-text">特殊节点 &amp; 类型</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E6%89%A7%E8%A1%8C%E6%96%B9%E6%B3%95"><span class="toc-number">1.7.4.</span> <span class="toc-text">执行方法</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AB%E3%80%81%E5%B8%B8%E8%B8%A9%E7%9A%84%E5%9D%91"><span class="toc-number">1.8.</span> <span class="toc-text">八、常踩的坑</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B9%9D%E3%80%81%E5%B0%8F%E7%BB%93"><span class="toc-number">1.9.</span> <span class="toc-text">九、小结</span></a></li></ol></li></ol></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2025 - 2026 By QDeepFlow</span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@6.1.9/dist/fancybox/fancybox.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/instant.page@5.2.0/instantpage.min.js" type="module"></script><script src="https://cdn.jsdelivr.net/npm/vanilla-lazyload@19.1.3/dist/lazyload.iife.min.js"></script><script src="https://cdn.jsdelivr.net/npm/node-snackbar@0.1.16/dist/snackbar.min.js"></script><div class="js-pjax"><script>(() => {
+  const parseViewBox = viewBox => {
+    if (!viewBox) return null
+    const parts = viewBox.trim().split(/[\s,]+/).map(n => Number(n))
+    if (parts.length !== 4 || parts.some(n => Number.isNaN(n))) return null
+    return parts
+  }
+
+  const getSvgViewBox = svg => {
+    const attr = parseViewBox(svg.getAttribute('viewBox'))
+    if (attr) return attr
+
+    // Fallback: use bbox to build a viewBox
+    try {
+      const bbox = svg.getBBox()
+      if (bbox && bbox.width && bbox.height) return [bbox.x, bbox.y, bbox.width, bbox.height]
+    } catch (e) {
+      // getBBox may fail on some edge cases; ignore
+    }
+
+    const w = Number(svg.getAttribute('width')) || 0
+    const h = Number(svg.getAttribute('height')) || 0
+    if (w > 0 && h > 0) return [0, 0, w, h]
+    return [0, 0, 100, 100]
+  }
+
+  const setSvgViewBox = (svg, vb) => {
+    svg.setAttribute('viewBox', `${vb[0]} ${vb[1]} ${vb[2]} ${vb[3]}`)
+  }
+
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v))
+
+  const openSvgInNewTab = ({ source, initViewBox }) => {
+    const getClonedSvg = () => {
+      if (typeof source === 'string') {
+        const template = document.createElement('template')
+        template.innerHTML = source.trim()
+        const svg = template.content.querySelector('svg')
+        return svg ? svg.cloneNode(true) : null
+      }
+      if (source && typeof source.cloneNode === 'function') {
+        return source.cloneNode(true)
+      }
+      return null
+    }
+
+    const clone = getClonedSvg()
+    if (!clone) return
+    if (initViewBox && initViewBox.length === 4) {
+      clone.setAttribute('viewBox', initViewBox.join(' '))
+    }
+    if (!clone.getAttribute('xmlns')) clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+    if (!clone.getAttribute('xmlns:xlink') && clone.outerHTML.includes('xlink:')) {
+      clone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink')
+    }
+    // inject background to match current theme
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+    const bg = getComputedStyle(document.body).backgroundColor || (isDark ? '#1e1e1e' : '#ffffff')
+    if (!clone.style.background) clone.style.background = bg
+
+    const serializer = new XMLSerializer()
+    const svgSource = serializer.serializeToString(clone)
+    const htmlSource = `<!doctype html><html><head><meta charset="utf-8" />
+      <style>
+        html, body { width: 100%; height: 100%; margin: 0; display: flex; align-items: center; justify-content: center; background: ${bg}; }
+        svg { max-width: 100%; max-height: 100%; height: auto; width: auto; }
+      </style>
+      </head><body>${svgSource}</body></html>`
+    const blob = new Blob([htmlSource], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank', 'noopener')
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
+  }
+
+  const attachMermaidViewerButton = wrap => {
+    let btn = wrap.querySelector('.mermaid-open-btn')
+    if (!btn) {
+      btn = document.createElement('button')
+      btn.type = 'button'
+      btn.className = 'mermaid-open-btn'
+      wrap.appendChild(btn)
+    }
+
+    btn.innerHTML = '<i class="fa fa-search fa-fw" aria-hidden="true"></i>'
+
+    if (!btn.__mermaidViewerBound) {
+      btn.addEventListener('click', e => {
+        e.preventDefault()
+        e.stopPropagation()
+        const svg = wrap.__mermaidOriginalSvg || wrap.querySelector('svg')
+        if (!svg) return
+        const initViewBox = wrap.__mermaidInitViewBox
+        if (typeof svg === 'string') {
+          openSvgInNewTab({ source: svg, initViewBox })
+          return
+        }
+        openSvgInNewTab({ source: svg, initViewBox })
+      })
+      btn.__mermaidViewerBound = true
+    }
+  }
+
+  // Zoom around a point (px, py) in the SVG viewport (in viewBox coordinates)
+  const zoomAtPoint = (vb, factor, px, py) => {
+    const w = vb[2] * factor
+    const h = vb[3] * factor
+    const nx = px - (px - vb[0]) * factor
+    const ny = py - (py - vb[1]) * factor
+    return [nx, ny, w, h]
+  }
+
+  const initMermaidGestures = wrap => {
+    const svg = wrap.querySelector('svg')
+    if (!svg) return
+
+    // Ensure viewBox exists so gestures always work
+    const initVb = getSvgViewBox(svg)
+    wrap.__mermaidInitViewBox = initVb
+    wrap.__mermaidCurViewBox = initVb.slice()
+    setSvgViewBox(svg, initVb)
+
+    // Avoid binding multiple times on themeChange/pjax
+    if (wrap.__mermaidGestureBound) return
+    wrap.__mermaidGestureBound = true
+
+    // Helper: map client (viewport) coordinate -> viewBox coordinate
+    const clientToViewBox = (clientX, clientY) => {
+      const rect = svg.getBoundingClientRect()
+      const vb = wrap.__mermaidCurViewBox || getSvgViewBox(svg)
+      const x = vb[0] + (clientX - rect.left) * (vb[2] / rect.width)
+      const y = vb[1] + (clientY - rect.top) * (vb[3] / rect.height)
+      return { x, y, rect, vb }
+    }
+
+    const state = {
+      pointers: new Map(),
+      startVb: null,
+      startDist: 0,
+      startCenter: null
+    }
+
+    const clampVb = vb => {
+      const init = wrap.__mermaidInitViewBox || vb
+      const minW = init[2] * 0.1
+      const maxW = init[2] * 10
+      const minH = init[3] * 0.1
+      const maxH = init[3] * 10
+      vb[2] = clamp(vb[2], minW, maxW)
+      vb[3] = clamp(vb[3], minH, maxH)
+      return vb
+    }
+
+    const setCurVb = vb => {
+      vb = clampVb(vb)
+      wrap.__mermaidCurViewBox = vb
+      setSvgViewBox(svg, vb)
+    }
+
+    const onPointerDown = e => {
+      // Allow only primary button for mouse
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      svg.setPointerCapture(e.pointerId)
+      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      if (state.pointers.size === 1) {
+        state.startVb = (wrap.__mermaidCurViewBox || getSvgViewBox(svg)).slice()
+      } else if (state.pointers.size === 2) {
+        const pts = [...state.pointers.values()]
+        const dx = pts[0].x - pts[1].x
+        const dy = pts[0].y - pts[1].y
+        state.startDist = Math.hypot(dx, dy)
+        state.startVb = (wrap.__mermaidCurViewBox || getSvgViewBox(svg)).slice()
+        state.startCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+      }
+    }
+
+    const onPointerMove = e => {
+      if (!state.pointers.has(e.pointerId)) return
+      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+      // Pan with 1 pointer
+      if (state.pointers.size === 1 && state.startVb) {
+        const p = [...state.pointers.values()][0]
+        const prev = { x: e.clientX - e.movementX, y: e.clientY - e.movementY }
+        // movementX/Y unreliable on touch, compute from stored last position
+        const last = wrap.__mermaidLastSinglePointer || p
+        const dxClient = p.x - last.x
+        const dyClient = p.y - last.y
+        wrap.__mermaidLastSinglePointer = p
+
+        const { rect } = clientToViewBox(p.x, p.y)
+        const vb = (wrap.__mermaidCurViewBox || getSvgViewBox(svg)).slice()
+        const dx = dxClient * (vb[2] / rect.width)
+        const dy = dyClient * (vb[3] / rect.height)
+        setCurVb([vb[0] - dx, vb[1] - dy, vb[2], vb[3]])
+        return
+      }
+
+      // Pinch zoom with 2 pointers
+      if (state.pointers.size === 2 && state.startVb && state.startDist > 0) {
+        const pts = [...state.pointers.values()]
+        const dx = pts[0].x - pts[1].x
+        const dy = pts[0].y - pts[1].y
+        const dist = Math.hypot(dx, dy)
+        if (!dist) return
+        const factor = state.startDist / dist // dist bigger => zoom in (viewBox smaller)
+
+        const cx = (pts[0].x + pts[1].x) / 2
+        const cy = (pts[0].y + pts[1].y) / 2
+        const centerClient = { x: cx, y: cy }
+
+        const pxy = clientToViewBox(centerClient.x, centerClient.y)
+        const cpx = pxy.x
+        const cpy = pxy.y
+
+        const vb = zoomAtPoint(state.startVb, factor, cpx, cpy)
+        setCurVb(vb)
+      }
+    }
+
+    const onPointerUpOrCancel = e => {
+      state.pointers.delete(e.pointerId)
+      if (state.pointers.size === 0) {
+        state.startVb = null
+        state.startDist = 0
+        state.startCenter = null
+        wrap.__mermaidLastSinglePointer = null
+      } else if (state.pointers.size === 1) {
+        // reset single pointer baseline to avoid jump
+        wrap.__mermaidLastSinglePointer = [...state.pointers.values()][0]
+      }
+    }
+
+    // Wheel zoom (mouse/trackpad)
+    const onWheel = e => {
+      // ctrlKey on mac trackpad pinch; we treat both as zoom
+      e.preventDefault()
+      const delta = e.deltaY
+      const zoomFactor = delta > 0 ? 1.1 : 0.9
+      const { x, y } = clientToViewBox(e.clientX, e.clientY)
+      const vb = (wrap.__mermaidCurViewBox || getSvgViewBox(svg)).slice()
+      setCurVb(zoomAtPoint(vb, zoomFactor, x, y))
+    }
+
+    const onDblClick = () => {
+      const init = wrap.__mermaidInitViewBox
+      if (!init) return
+      wrap.__mermaidCurViewBox = init.slice()
+      setSvgViewBox(svg, init)
+    }
+
+    svg.addEventListener('pointerdown', onPointerDown)
+    svg.addEventListener('pointermove', onPointerMove)
+    svg.addEventListener('pointerup', onPointerUpOrCancel)
+    svg.addEventListener('pointercancel', onPointerUpOrCancel)
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    svg.addEventListener('dblclick', onDblClick)
+  }
+
+  const runMermaid = ele => {
+    window.loadMermaid = true
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default'
+
+    ele.forEach((item, index) => {
+      const mermaidSrc = item.firstElementChild
+
+      // Clear old render (themeChange/pjax will rerun)
+      const oldSvg = item.querySelector('svg')
+      if (oldSvg) oldSvg.remove()
+      item.__mermaidGestureBound = false
+
+      const config = mermaidSrc.dataset.config ? JSON.parse(mermaidSrc.dataset.config) : {}
+      if (!config.theme) {
+        config.theme = theme
+      }
+      const mermaidThemeConfig = `%%{init: ${JSON.stringify(config)}}%%\n`
+      const mermaidID = `mermaid-${index}`
+      const mermaidDefinition = mermaidThemeConfig + mermaidSrc.textContent
+
+      const renderFn = mermaid.render(mermaidID, mermaidDefinition)
+      const renderMermaid = svg => {
+        mermaidSrc.insertAdjacentHTML('afterend', svg)
+        if (true) initMermaidGestures(item)
+        item.__mermaidOriginalSvg = svg
+        if (true) attachMermaidViewerButton(item)
+      }
+
+
+      // mermaid v9 and v10 compatibility
+      typeof renderFn === 'string' ? renderMermaid(renderFn) : renderFn.then(({ svg }) => renderMermaid(svg))
+    })
+  }
+
+  const codeToMermaid = () => {
+    const codeMermaidEle = document.querySelectorAll('pre > code.mermaid')
+    if (codeMermaidEle.length === 0) return
+
+    codeMermaidEle.forEach(ele => {
+      const preEle = document.createElement('pre')
+      preEle.className = 'mermaid-src'
+      preEle.hidden = true
+      preEle.textContent = ele.textContent
+      const newEle = document.createElement('div')
+      newEle.className = 'mermaid-wrap'
+      newEle.appendChild(preEle)
+      ele.parentNode.replaceWith(newEle)
+    })
+  }
+
+  const loadMermaid = () => {
+    if (false) codeToMermaid()
+    const $mermaid = document.querySelectorAll('#article-container .mermaid-wrap')
+    if ($mermaid.length === 0) return
+
+    const runMermaidFn = () => runMermaid($mermaid)
+    btf.addGlobalFn('themeChange', runMermaidFn, 'mermaid')
+    window.loadMermaid ? runMermaidFn() : btf.getScript('https://cdn.jsdelivr.net/npm/mermaid@11.12.2/dist/mermaid.min.js').then(runMermaidFn)
+  }
+
+  btf.addGlobalFn('encrypt', loadMermaid, 'mermaid')
+  window.pjax ? loadMermaid() : document.addEventListener('DOMContentLoaded', loadMermaid)
+})()</script></div><canvas class="fireworks" mobile="false"></canvas><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/dist/fireworks.min.js"></script><script id="canvas_nest" defer="defer" color="8,145,178" opacity="0.3" zIndex="-1" count="100" mobile="false" src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/dist/canvas-nest.min.js"></script><script src="https://cdn.jsdelivr.net/npm/pjax@0.2.8/pjax.min.js" defer="defer"></script><script>document.addEventListener('DOMContentLoaded', () => {
+  const pjaxSelectors = ["head > title","#config-diff","#body-wrap","#rightside-config-hide","#rightside-config-show",".js-pjax"]
+
+  window.pjax = new Pjax({
+    elements: 'a:not([target="_blank"])',
+    selectors: pjaxSelectors,
+    cacheBust: false,
+    analytics: false,
+    scrollRestoration: false
+  })
+
+  const triggerPjaxFn = (val) => {
+    if (!val) return
+    Object.values(val).forEach(fn => {
+      try {
+        fn()
+      } catch (err) {
+        console.debug('Pjax callback failed:', err)
+      }
+    })
+  }
+
+  document.addEventListener('pjax:send', () => {
+    // removeEventListener
+    btf.removeGlobalFnEvent('pjaxSendOnce')
+    btf.removeGlobalFnEvent('themeChange')
+
+    // reset readmode
+    const $bodyClassList = document.body.classList
+    if ($bodyClassList.contains('read-mode')) $bodyClassList.remove('read-mode')
+
+    triggerPjaxFn(window.globalFn.pjaxSend)
+  })
+
+  document.addEventListener('pjax:complete', () => {
+    btf.removeGlobalFnEvent('pjaxCompleteOnce')
+    document.querySelectorAll('script[data-pjax]').forEach(item => {
+      const newScript = document.createElement('script')
+      const content = item.text || item.textContent || item.innerHTML || ""
+      Array.from(item.attributes).forEach(attr => newScript.setAttribute(attr.name, attr.value))
+      newScript.appendChild(document.createTextNode(content))
+      item.parentNode.replaceChild(newScript, item)
+    })
+
+    triggerPjaxFn(window.globalFn.pjaxComplete)
+  })
+
+  document.addEventListener('pjax:error', e => {
+    if (e.request.status === 404) {
+      true
+        ? pjax.loadUrl('/404.html')
+        : window.location.href = e.request.responseURL
+    }
+  })
+})</script><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><i class="fas fa-spinner fa-pulse" id="loading-status" hidden="hidden"></i><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="text-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据加载中</span></div><div class="local-search-input"><input placeholder="🔍 搜索文章..." type="text"/></div><hr/><div id="local-search-results"></div><div class="ais-Pagination" id="local-search-pagination" style="display:none;"><ul class="ais-Pagination-list"></ul></div><div id="local-search-stats"></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=5.5.4"></script></div></div></body></html>
